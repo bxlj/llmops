@@ -1,0 +1,93 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+@Time    : 2024/7/19 17:41
+@Author  : thezehui@gmail.com
+@File    : helper.py
+"""
+import importlib
+from datetime import datetime
+from enum import Enum
+from hashlib import sha3_256
+from typing import Any
+from uuid import UUID
+
+from langchain_core.documents import Document
+from pydantic import BaseModel, AnyUrl
+
+
+def dynamic_import(module_name: str, symbol_name: str) -> Any:
+    """动态导入特定模块下的特定功能"""
+    module = importlib.import_module(module_name)
+    return getattr(module, symbol_name)
+
+
+def add_attribute(attr_name: str, attr_value: Any):
+    """装饰器函数，为特定的函数添加相应的属性，第一个参数为属性名字，第二个参数为属性值"""
+
+    def decorator(func):
+        setattr(func, attr_name, attr_value)
+        return func
+
+    return decorator
+
+
+def generate_text_hash(text: str) -> str:
+    """根据传递的文本计算对应的哈希值"""
+    # 1.将需要计算哈希值的内容加上None这个字符串，避免传递了空字符串导致计算出错
+    text = str(text) + "None"
+
+    # 2.使用sha3_256将数据转换成哈希值后返回
+    return sha3_256(text.encode()).hexdigest()
+
+
+def datetime_to_timestamp(dt: datetime) -> int:
+    """将传入的datetime时间转换成时间戳，如果数据不存在则返回0"""
+    if dt is None:
+        return 0
+    return int(dt.timestamp())
+
+
+def combine_documents(documents: list[Document]) -> str:
+    """将对应的文档列表使用换行符进行合并"""
+    return "\n\n".join([document.page_content for document in documents])
+
+
+def remove_fields(data_dict: dict, remove_fields: list[str]) -> None:
+    for field in remove_fields:
+        data_dict.pop(field, None)
+
+
+def convert_model_to_dict(obj: Any, **kwargs) -> Any:
+    """辅助函数，将Pydantic V2版本中的UUID/Enum等数据转换成可序列化存储的数据。"""
+    # 1.如果是Pydantic的BaseModel类型，递归处理其字段
+    if isinstance(obj, BaseModel):
+        obj_dict = obj.model_dump(**kwargs)
+        # 2.递归处理嵌套字段
+        for key, value in obj_dict.items():
+            obj_dict[key] = convert_model_to_dict(value, **kwargs)
+        return obj_dict
+
+    # 3.如果是 UUID 类型，转换为字符串
+    elif isinstance(obj, UUID):
+        return str(obj)
+
+    # 4.如果是 Url 类型（如HttpUrl），转换为字符串
+    # 4.如果是 Url 类型（如HttpUrl），转换为字符串
+    elif isinstance(obj, AnyUrl):
+        return str(obj)
+
+    # 5.如果是 Enum 类型，转换为其值
+    elif isinstance(obj, Enum):
+        return obj.value
+
+    # 6.如果是列表类型，递归处理列表中的每个元素
+    elif isinstance(obj, list):
+        return [convert_model_to_dict(item, **kwargs) for item in obj]
+
+    # 7.如果是字典类型，递归处理字典中的每个字段
+    elif isinstance(obj, dict):
+        return {key: convert_model_to_dict(value, **kwargs) for key, value in obj.items()}
+
+    # 8.对其他类型的字段，保持原样
+    return obj
