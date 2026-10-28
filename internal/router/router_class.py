@@ -25,7 +25,8 @@ from internal.handler import (
     ApiKeyHandler,
     OpenAPIHandler,
     BuiltInAppHandler,
-    WorkflowHandler
+    WorkflowHandler,
+    LanguageModelHandel
 )
 
 
@@ -49,6 +50,7 @@ class Router:
     openapi_handler: OpenAPIHandler
     builtin_app_handler: BuiltInAppHandler
     workflow_handler: WorkflowHandler
+    language_model_handel: LanguageModelHandel
 
     def register_router(self, app: Flask):
         """注册路由"""
@@ -378,6 +380,14 @@ class Router:
         bp.add_url_rule("/workflows/<uuid:workflow_id>/cancel-publish",
                         methods=["POST"],
                         view_func=self.workflow_handler.cancel_publish_workflow)
+
+        # 12 语言模型模块
+        bp.add_url_rule("/language_models",
+                        view_func=self.language_model_handel.get_language_models)
+        bp.add_url_rule("/language_models/<string:provider_name>/<string:model_name>",
+                        view_func=self.language_model_handel.get_language_model)
+        bp.add_url_rule("/language_models/<string:provider_name>/icon",
+                        view_func=self.language_model_handel.get_language_model_icon)
         # 练习
         bp.add_url_rule(
             "/user/create",

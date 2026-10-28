@@ -1,0 +1,15 @@
+model: kimi-k3
+label: kimi-k3
+model_type: chat
+features:
+  - tool_call
+  - agent_thought
+  - image_input
+context_window: 1048576
+max_output_tokens: 65536
+attributes:
+  model: kimi-k3
+parameters:
+  - name: max_tokens
+    use_template: max_completion_tokens
+    default: 32768

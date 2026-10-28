@@ -4,12 +4,12 @@
 @File    : provider_entity.py
 """
 import os.path
-from typing import Union, Type, Any
+from typing import Union, Type, Any, Optional
 
 import yaml
 from pydantic import model_validator, BaseModel, Field
 
-from internal.exception import FailException
+from internal.exception import FailException, NotFoundException
 from internal.lib.helper import dynamic_import
 from .default_model_parameter_template import DEFAULT_MODEL_PARAMETER_TEMPLATE
 from .model_entity import ModelType, ModelEntity, BaseLanguageModel
@@ -34,8 +34,13 @@ class Provider(BaseModel):
     model_class_map: dict[str, Union[None, Type[BaseLanguageModel]]] = Field(default_factory=dict)  # 模型类映射
 
     @model_validator(mode="before")
+    @classmethod
     def validate_provider(cls, provider: dict[str, Any]) -> dict[str, Any]:
         """服务提供者校验器，利用校验器完成该服务提供者的实体与类实例化"""
+        # before模式拿到的是原始入参dict，不包含带默认值的字段，需先初始化
+        provider.setdefault("model_class_map", {})
+        provider.setdefault("model_entity_map", {})
+
         # 1.获取服务提供商实体
         provider_entity: ProviderEntity = provider["provider_entity"]
 
@@ -51,7 +56,7 @@ class Provider(BaseModel):
         # 4.获取当前类所在的位置，provider提供商所在的位置
         current_path = os.path.abspath(__file__)
         entities_path = os.path.dirname(current_path)
-        provider_path = os.path.join(os.path.dirname(entities_path), "providers", provider_entity.name)
+        provider_path = os.path.join(entities_path, "..", "providers", provider_entity.name)
 
         # 5.组装positions.yaml的位置，并读取数据
         positions_yaml_path = os.path.join(provider_path, "positions.yaml")
@@ -88,4 +93,20 @@ class Provider(BaseModel):
 
         return provider
 
-    """根据传递的模型类型获取该提供者的模型类"""
+    def get_model_class(self, model_type: ModelType) -> Optional[Type[BaseLanguageModel]]:
+        """根据传递的模型类型获取该提供者的模型类"""
+        model_class = self.model_class_map.get(model_type, None)
+        if model_class is None:
+            raise NotFoundException("该模型类不存在，请核实后重试")
+        return model_class
+
+    def get_model_entity(self, mode_name: str) -> ModelEntity:
+        """根据传递的模型名字获取模型实体信息"""
+        mode_entity = self.model_entity_map.get(mode_name, None)
+        if mode_entity is None:
+            raise NotFoundException("该模型实体不存在，请核实后重试")
+        return mode_entity
+
+    def get_model_entities(self) -> list[ModelEntity]:
+        """获取该服务提供者的所有模型实体列表信息"""
+        return self.model_entity_map.values()

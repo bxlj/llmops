@@ -17,6 +17,11 @@ from langchain_openai import ChatOpenAI
 os.environ["LANGCHAIN_TRACING"] = "false"
 os.environ["LANGCHAIN_VERBOSE"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
+
+# 从项目根目录的.env中加载密钥（密钥绝不能硬编码在源码里并提交到仓库）
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".env"))
 # 初始化提示词模板
 prompt = ChatPromptTemplate.from_messages([
     ("system", "你是AI聊天机器人，请帮助用户解决问题"),
@@ -27,7 +32,7 @@ prompt = ChatPromptTemplate.from_messages([
 
 # 初始化LLM模型
 llm = ChatOpenAI(
-    api_key="sk-f0IfbwLmAWocLLP3ku3VWcErPgexDTDl9kAiHpej9HkY2OF5",
+    api_key=os.environ.get("OPENAI_API_KEY"),
     base_url="https://api.moonshot.cn/v1",
     model="moonshot-v1-8k",
     temperature=0.1,  # 回答更稳定
