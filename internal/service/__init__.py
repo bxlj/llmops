@@ -8,6 +8,7 @@ from .ai_service import AIService
 from .api_key_service import ApiKeyService
 from .app_config_service import AppConfigService
 from .app_service import AppService
+from .assistant_agent_service import AssistantAgentService
 from .base_service import BaseService
 from .builtin_app_service import BuiltinAppService
 from .builtin_tool_service import BuiltinToolService
@@ -38,5 +39,5 @@ __all__ = ['AppService', 'BuiltinToolService',
            'AIService', 'ApiKeyService',
            'AppConfigService', 'OpenAPIService',
            'BuiltinAppService', 'RetrievalService',
-           'WorkflowService'
+           'WorkflowService', "AssistantAgentService",
            ]

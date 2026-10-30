@@ -7,6 +7,7 @@ from .account_schema import GetCurrentUserResp, UpdatePasswordReq, UpdateNameReq
 from .api_tool_schema import ValidateOpenAPISchemaReq, ValidateCreateAPISchemaReq, GetApiToolProviderResp, \
     GetApiToolResp, GetToolProviderWithPageReq, GetApiToolProvidersWithPageResp, UpdateAPISchemaReq
 from .app_schema import CompletionReq
+from .assistant_agent_schema import AssistantAgentChatReq
 from .auth_schema import PasswordLoginReq, PasswordLoginResp
 from .dataset_schema import (ValidateCreateDatasetReq, GetDatasetResp, GetDatasetWithPageRep,
                              GetDatasetsWithPageResp, UpdateDatasetReq)
@@ -32,5 +33,5 @@ __all__ = ['ValidateOpenAPISchemaReq',
            'UpdateAvatarReq',
            'PasswordLoginReq',
            'PasswordLoginResp',
-
+           'AssistantAgentChatReq'
            ]

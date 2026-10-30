@@ -26,7 +26,8 @@ from internal.handler import (
     OpenAPIHandler,
     BuiltInAppHandler,
     WorkflowHandler,
-    LanguageModelHandel
+    LanguageModelHandel,
+    AssistantAgentHandler
 )
 
 
@@ -51,6 +52,7 @@ class Router:
     builtin_app_handler: BuiltInAppHandler
     workflow_handler: WorkflowHandler
     language_model_handel: LanguageModelHandel
+    assistant_agent_handler: AssistantAgentHandler
 
     def register_router(self, app: Flask):
         """注册路由"""
@@ -388,6 +390,28 @@ class Router:
                         view_func=self.language_model_handel.get_language_model)
         bp.add_url_rule("/language_models/<string:provider_name>/icon",
                         view_func=self.language_model_handel.get_language_model_icon)
+
+        # 13.辅助Agent模块
+        bp.add_url_rule(
+            "/assistant-agent/chat",
+            methods=["POST"],
+            view_func=self.assistant_agent_handler.assistant_agent_chat,
+        )
+        bp.add_url_rule(
+            "/assistant-agent/chat/<uuid:task_id>/stop",
+            methods=["POST"],
+            view_func=self.assistant_agent_handler.stop_assistant_agent_chat,
+        )
+        bp.add_url_rule(
+            "/assistant-agent/messages",
+            view_func=self.assistant_agent_handler.get_assistant_agent_messages_with_page,
+        )
+        bp.add_url_rule(
+            "/assistant-agent/delete-conversation",
+            methods=["POST"],
+            view_func=self.assistant_agent_handler.delete_assistant_agent_conversation,
+        )
+
         # 练习
         bp.add_url_rule(
             "/user/create",
