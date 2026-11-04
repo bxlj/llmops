@@ -16,6 +16,7 @@ from .conversation_service import ConversationService
 from .dataset_service import DatasetService
 from .document_service import DocumentService
 from .embeddings_service import EmbeddingsService
+from .faiss_service import FaissService
 from .index_service import IndexService
 from .jieba_service import JiebaService
 from .jwt_service import JwtService
@@ -40,4 +41,5 @@ __all__ = ['AppService', 'BuiltinToolService',
            'AppConfigService', 'OpenAPIService',
            'BuiltinAppService', 'RetrievalService',
            'WorkflowService', "AssistantAgentService",
+           "FaissService"
            ]

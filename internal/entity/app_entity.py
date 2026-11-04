@@ -5,6 +5,16 @@
 """
 from enum import Enum
 
+# 生成icon描述提示词模板
+GENERATE_ICON_PROMPT_TEMPLATE = """你是一个拥有10年经验的AI绘画工程师，可以将用户传递的`应用名称`和`应用描述`转换为对应应用的icon描述。
+该描述用于AI绘画模型生成App图标，用户传递的数据如下:
+
+应用名称: {name}。
+应用描述: {description}。
+
+绘制要求：极简扁平风格、构图居中、色彩不超过3种、纯色背景、图中不要出现任何文字和字母。
+除了icon描述提示词外，其他什么都不要生成"""
+
 
 class AppStatus(str, Enum):
     """应用状态枚举类"""
@@ -24,7 +34,7 @@ DEFAULT_APP_CONFIG = {
         "provider": "openai",
         "model": "kimi-k2.6",
         "parameters": {
-            "temperature": 0.5,
+            "temperature": 1,
             "top_p": 0.85,
             "frequency_penalty": 0.2,
             "presence_penalty": 0.2,

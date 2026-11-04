@@ -3,6 +3,8 @@
 @AUthor  : jiachengjie
 @File    : app.py
 """
+import os
+
 import dotenv
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -17,6 +19,14 @@ from pkg.sqlalchemy import SQLAlchemy
 
 # 将.evn加载到环境变量中
 dotenv.load_dotenv()
+
+# Windows专属兼容：eventlet池绿化的ssl与httpx2默认的truststore在TLS握手时互相递归
+# (RecursionError)，指定certifi证书包可让httpx2改走标准ssl上下文。
+# 仅Windows需要；Linux(epoll hub)无此问题，不设置，避免影响部署环境
+import sys
+if sys.platform == "win32" and not os.environ.get("SSL_CERT_FILE"):
+    import certifi
+    os.environ["SSL_CERT_FILE"] = certifi.where()
 
 injector = Injector([ExtensionModule])
 

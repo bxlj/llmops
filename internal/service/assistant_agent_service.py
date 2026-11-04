@@ -13,23 +13,27 @@ from uuid import UUID
 from flask import current_app
 from injector import inject
 from langchain_core.messages import HumanMessage
+from langchain_core.tools import BaseTool, tool
+from pydantic import BaseModel, Field
 from sqlalchemy import desc
 
 from internal.core.agent.agents import AgentQueueManager
 from internal.core.agent.agents import FunctionCallAgent
 from internal.core.agent.entities.agent_entity import AgentConfig
 from internal.core.agent.entities.queue_entity import QueueEvent
+from internal.core.language_model.entities.model_entity import ModelFeature
 from internal.core.language_model.providers.moonshot.chat import Chat
 from internal.core.memory.token_buffer_memory import TokenBufferMemory
 from internal.entity.conversation_entity import InvokeFrom, MessageStatus
 from internal.model.account import Account
-from internal.service import BaseService
-from internal.service import ConversationService
-from language_model.entities.model_entity import ModelFeature
-from model import Message
+from internal.model.conversation import Message
+from internal.schema.assistant_agent_schema import GetAssistantAgentWithPageReq
+from internal.service.conversation_service import ConversationService
+from internal.service.faiss_service import FaissService
+from internal.task.app_task import auto_create_app
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
-from schema.assistant_agent_schema import GetAssistantAgentWithPageReq
+from .base_service import BaseService
 
 
 @inject
@@ -37,6 +41,7 @@ from schema.assistant_agent_schema import GetAssistantAgentWithPageReq
 class AssistantAgentService(BaseService):
     """辅助智能体业务层"""
     db: SQLAlchemy
+    faiss_service: FaissService
     conversation_service: ConversationService
 
     def chat(self, query: str, account: Account) -> Generator:
@@ -74,7 +79,10 @@ class AssistantAgentService(BaseService):
         history = token_buffer_memory.get_history_prompt_message(message_limit=3)
 
         # TODO 6.将草稿配置中的tools转换成LangChain工具
-        tools = []
+        tools = [
+            self.faiss_service.convert_faiss_to_tool(),
+            self.convert_create_app_to_tools(account.id),
+        ]
 
         # 7.构建Agent智能体，使用FunctionCallAgent
         agent = FunctionCallAgent(
@@ -123,7 +131,7 @@ class AssistantAgentService(BaseService):
                 "message_id": str(message.id),
                 "task_id": str(agent_thought.task_id),
             }
-            yield f"event: {agent_thought.event}\ndata: {json.dumps(data)}\n"
+            yield f"event: {agent_thought.event}\ndata: {json.dumps(data)}\n\n"
 
         # 14.将消息以及推理过程添加到数据库
         thread = Thread(
@@ -138,6 +146,7 @@ class AssistantAgentService(BaseService):
                 "conversation_id": conversation.id,
                 "message_id": message.id,
                 "agent_thoughts": [agent_thought for agent_thought in agent_thoughts.values()],
+                "invoke_from": InvokeFrom.ASSISTANT_AGENT,
             }
         )
 
@@ -148,12 +157,13 @@ class AssistantAgentService(BaseService):
         """获取当前登录账号的辅助Agent对话历史列表"""
         # 1.获取应用的调试会话
         conversation = account.assistant_agent_conversation
+        print(f"conversation值是：{conversation.id}")
         # 2. 构建分页器
         paginator = Paginator(db=self.db, req=req)
 
         # 3. 构建筛选器
         filters = []
-        if req.data.created_at:
+        if req.created_at.data:
             # 3.将时间戳转换成DateTime
             created_at_datetime = datetime.fromtimestamp(req.created_at.data)
             filters.append(Message.created_at <= created_at_datetime)
@@ -177,3 +187,24 @@ class AssistantAgentService(BaseService):
     def stop_chat(self, task_id: UUID, account: Account) -> None:
         """根据传递的任务id+账号停止某次响应会话"""
         AgentQueueManager.set_stop_flag(task_id, InvokeFrom.ASSISTANT_AGENT, account.id)
+
+    @classmethod
+    def convert_create_app_to_tools(cls, account_id: UUID) -> BaseTool:
+        """定义自动创建Agent应用LangChain工具"""
+
+        class CreateAppTools(BaseModel):
+            name: str = Field(description="需要创建的Agent/应用名称,长度最多50个字符")
+            description: str = Field(description="需要创建的Agent/描述信息，请详细概括该应用的功能")
+
+        @tool("create_app", args_schema=CreateAppTools)
+        def create_app(name: str, description: str) -> str:
+            """如果用户提出要创建一个Agent应用，你可以调用此工具，参数的输入是应用的名称 + 描述，返回的提示是创建后的成功提示"""
+            # 1.提交celery任务并同步等待结果。
+            # 工具执行夹在Agent的两次LLM调用之间：此刻Flask侧没有在途的Moonshot请求，
+            # 任务内两次顺序调用不会与最终回答的流式响应争抢组织并发=1的配额；
+            # 同时任务异常会在这里抛出，避免"实际失败却告诉用户创建成功"。更换为质谱多并发访问
+            auto_create_app.delay(account_id, name, description)
+
+            return f"已调用后端服务创建Agent应用成功，名字是：{name}，描述信息为：{description}"
+
+        return create_app

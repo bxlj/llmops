@@ -9,8 +9,8 @@ from marshmallow import Schema, fields, pre_dump
 from wtforms import StringField, IntegerField
 from wtforms.validators import DataRequired, Optional, NumberRange
 
+from internal.lib.helper import datetime_to_timestamp
 from internal.model import Message
-from lib.helper import datetime_to_timestamp
 from pkg.paginator import PaginatorReq
 
 

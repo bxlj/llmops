@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from injector import inject
 
 from internal.model import UploadFile
-from internal.service import BaseService
 from pkg.sqlalchemy import SQLAlchemy
+from .base_service import BaseService
 
 
 @inject

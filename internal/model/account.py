@@ -11,7 +11,7 @@ from sqlalchemy import (
     String,
     DateTime,
     text,
-    PrimaryKeyConstraint,
+    PrimaryKeyConstraint, update,
 )
 
 from internal.extension.database_extension import db
@@ -60,7 +60,7 @@ class Account(UserMixin, db.Model):
         ) if self.assistant_agent_conversation_id else None
 
         if not self.assistant_agent_conversation_id or not conversation:
-            with db.auto_commit:
+            with db.auto_commit():
                 conversation = Conversation(
                     app_id=assistant_agent_id,
                     name="New Conversation",
@@ -70,7 +70,13 @@ class Account(UserMixin, db.Model):
                 db.session.add(conversation)
                 db.session.flush()
 
-                # 5.更新当前账号的辅助Agent会话id
+                # 用显式UPDATE语句写库，避免detached实例setattr静默失败
+                db.session.execute(
+                    update(Account)
+                    .where(Account.id == self.id)
+                    .values(assistant_agent_conversation_id=conversation.id)
+                )
+                # 同步内存中的值，让本次请求后续代码能拿到
                 self.assistant_agent_conversation_id = conversation.id
         return conversation
 

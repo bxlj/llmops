@@ -208,6 +208,7 @@ class OpenAPIService(BaseService):
                         "conversation_id": conversation_id,
                         "message_id": message_id,
                         "agent_thoughts": [agent_thought for agent_thought in agent_thoughts_dict.values()],
+                        "invoke_from": InvokeFrom.SERVICE_API,
                     }
                 )
                 thread.start()
@@ -228,6 +229,7 @@ class OpenAPIService(BaseService):
                 "conversation_id": conversation_id,
                 "message_id": message_id,
                 "agent_thoughts": agent_result.agent_thoughts,
+                "invoke_from": InvokeFrom.SERVICE_API,
             }
         )
         thread.start()

@@ -27,3 +27,10 @@
   background: "#FFFFFF"
   supported_model_types:
     - chat
+- name: zhipu
+  label: 智谱AI
+  description: 智谱BigModel提供的模型，例如GLM-5.3、GLM-5.3-Flash等。
+  icon: icon.png
+  background: "#FFFFFF"
+  supported_model_types:
+    - chat

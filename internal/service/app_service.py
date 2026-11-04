@@ -3,6 +3,7 @@
 @Author  : jiachengjie
 @File    : app_service.py
 """
+import io
 import json
 import os
 from dataclasses import dataclass
@@ -11,14 +12,22 @@ from threading import Thread
 from typing import Any, Generator
 from uuid import UUID
 
+import requests
 from flask import current_app
 from injector import inject
 from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableParallel
 from langchain_openai import ChatOpenAI
 from redis import Redis
 from sqlalchemy import func, desc
+from werkzeug.datastructures import FileStorage
+from zhipuai import ZhipuAI
 
-from internal.entity.app_entity import AppStatus, AppConfigType, DEFAULT_APP_CONFIG
+from internal.core.language_model.providers.zhipu.chat import Chat
+from internal.entity.ai_entity import OPTIMIZE_PROMPT_TEMPLATE
+from internal.entity.app_entity import AppStatus, AppConfigType, DEFAULT_APP_CONFIG, GENERATE_ICON_PROMPT_TEMPLATE
 from internal.model import (
     App,
     Account,
@@ -32,6 +41,7 @@ from internal.model import (
 )
 from internal.schema.app_schema import CreateAppReq, GetPublishHistoriesWithPage, \
     GetDebugConversationMessagesWithPageReq, GetAppWithPageReq
+from internal.service.cos_service import CosService
 from internal.service.retrieval_service import RetrievalService
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
@@ -55,11 +65,101 @@ class AppService(BaseService):
     """应用服务逻辑"""
     db: SQLAlchemy
     redis_client: Redis
+    cos_service: CosService
     app_config_service: AppConfigService
     conversation_service: ConversationService
     api_provider_manager: ApiProviderManager
     retrieval_service: RetrievalService
     builtin_provider_manager: BuiltinProviderManager
+
+    def auto_create_app(self, account_id: UUID, name: str, description: str) -> None:
+        """用于创建辅助agent"""
+        # 1.创建LLM，用于生成icon提示与预设提示词——GLM-5.3-Flash
+        # 注意：不能直接用os.environ.get取温度，env读出来是字符串"1"；kimi-k2.6强制temperature=1
+        llm = Chat(
+            model="GLM-5.3-Flash",
+        )
+
+        # 2.定义画图函数替代DallEAPIWrapper：调智谱CogView，返回图片url
+        def cogview_run(prompt: str) -> str:
+            """调用质谱大模型生成图片"""
+            client = ZhipuAI(
+                api_key=os.environ.get("ZHIPU_API_KEY"),
+            )
+            response = client.images.generations(
+                model="cogview-3-flash",
+                prompt=prompt,
+            )
+            return response.data[0].url
+
+        # 3.构建生成icon链
+        generate_icon_chain = ChatPromptTemplate.from_template(
+            GENERATE_ICON_PROMPT_TEMPLATE
+        ) | llm | StrOutputParser() | cogview_run
+
+        # 4.生成预设prompt链
+        generate_preset_prompt_chain = ChatPromptTemplate.from_messages([
+            ("system", OPTIMIZE_PROMPT_TEMPLATE),
+            ("human", f"应用名称：{name}\n\n应用描述：{description}")
+        ]) | llm | StrOutputParser()
+
+        # 5.顺序执行两条链（不能用RunnableParallel：Moonshot免费组织并发上限=1）
+
+        # 5.创建并行链同时执行两条链，不能用RunnableParallel：Moonshot免费组织并发上限=1,更换为质谱
+        generate_app_config_chain = RunnableParallel({
+            "icon": generate_icon_chain,
+            "preset_prompt": generate_preset_prompt_chain,
+        })
+        app_config = generate_app_config_chain.invoke({"name": name, "description": description})
+
+        # 6.将图片下载到本地后上传到腾讯云cos中
+        icon_response = requests.get(app_config.get("icon"), timeout=30)
+        if icon_response.status_code == 200:
+            icon_content = icon_response.content
+        else:
+            raise FailException("生成应用icon图标出错")
+
+        # 7. 获取account详细信息
+        account = self.get(Account, account_id)
+
+        # 8. 上传文件
+        upload_file = self.cos_service.upload_file(
+            FileStorage(io.BytesIO(icon_content), filename="icon.png", content_type="image/png"),
+            True,
+            account
+        )
+
+        icon_url = self.cos_service.get_file_url(upload_file.key)
+
+        # 9. 开启上下文提交数据
+        with self.db.auto_commit():
+            # 10. 创建应用记录并刷新数据，从而可以拿到应用id
+            app = App(
+                account_id=account.id,
+                name=name,
+                icon=icon_url,
+                description=description,
+                status=AppStatus.DRAFT,
+            )
+
+            self.db.session.add(app)
+            self.db.session.flush()
+
+            # 11. 添加草稿记录
+            app_config_version = AppConfigVersion(
+                app_id=app.id,
+                version=0,
+                config_type=AppConfigType.DRAFT,
+                **{
+                    **DEFAULT_APP_CONFIG,
+                    "preset_prompt": app_config.get("preset_prompt", ""),
+                }
+            )
+            self.db.session.add(app_config_version)
+            self.db.session.flush()
+
+            # 回填草稿配置指针（与 create_app / 内置应用入库保持一致）
+            app.draft_app_config_id = app_config_version.id
 
     def create_app(self, req: CreateAppReq, account: Account) -> App:
         """在个人空间下新增应用"""
@@ -429,10 +529,11 @@ class AppService(BaseService):
                 "flask_app": current_app._get_current_object(),
                 "account_id": account.id,
                 "app_id": app_id,
-                "draft_app_config": draft_app_config,
+                "app_config": draft_app_config,
                 "conversation_id": debug_conversation.id,
                 "message_id": message.id,
-                "agent_thoughts": agent_thoughts,
+                "agent_thoughts": [agent_thought for agent_thought in agent_thoughts.values()],
+                "invoke_from": InvokeFrom.DEBUGGER,
             }
         )
         thread.start()

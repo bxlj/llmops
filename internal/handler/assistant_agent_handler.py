@@ -56,5 +56,5 @@ class AssistantAgentHandler:
     @login_required
     def stop_assistant_agent_chat(self, task_id: UUID):
         """停止与辅助智能体的对话聊天"""
-        self.assistant_agent_service.stop_chat(task_id)
+        self.assistant_agent_service.stop_chat(task_id, current_user)
         return success_message("停止辅助Agent会话成功")

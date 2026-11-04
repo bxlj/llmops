@@ -15,12 +15,12 @@ from pkg.sqlalchemy import SQLAlchemy
 
 
 class PaginatorReq(FlaskForm):
-    current_page = IntegerField('current_page', validators=[
+    current_page = IntegerField('current_page', default=1, validators=[
         Optional(),
         NumberRange(min=1, max=9999, message='Current Page must be greater than or equal to 1.'),
     ])
 
-    page_size = IntegerField('page_size', validators=[
+    page_size = IntegerField('page_size', default=20, validators=[
         Optional(),
         NumberRange(min=1, max=50, message='Page size must be greater than or equal to 1.'),
     ])
@@ -31,7 +31,7 @@ class Paginator:
     """分页器"""
     total_page: int = 0  # 总页数
     total_record: int = 0  # 总条数
-    current_page: int = 0  # 当前页数
+    current_page: int = 1  # 当前页数
     page_size: int = 20  # 每条页数
 
     def __init__(self, db: SQLAlchemy, req: PaginatorReq = None):

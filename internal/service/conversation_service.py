@@ -30,17 +30,27 @@ class ConversationService(BaseService):
     db: SQLAlchemy
 
     @classmethod
+    def _build_llm(cls) -> ChatOpenAI:
+        """构建辅助任务(摘要/会话命名/建议问题)使用的LLM实例。
+
+        kimi-k2等带thinking的模型默认开启推理模式，而thinking开启时不允许强制工具调用
+        (tool_choice=required)，与with_structured_output的function_calling通道互斥，
+        这类轻量任务也不需要深度推理，因此统一通过extra_body关闭thinking。
+        """
+        return ChatOpenAI(
+            base_url=os.getenv("OPENAI_API_BASE"),
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model=os.getenv("OPENAI_MODEL_NAME"),
+            extra_body={"thinking": {"type": "disabled"}},
+        )
+
+    @classmethod
     def summary(cls, human_message: str, ai_message: str, old_summary: str) -> str:
         """根据传递的人类消息、AI消息还有原始的摘要信息总结生成一段新的摘要"""
         # 1. 创建prompt
         prompt = ChatPromptTemplate.from_template(SUMMARIZER_TEMPLATE)
         # 2. 构建大语言模型实例，并且将大语言模型的温度调低，降低幻觉的概率
-        llm = ChatOpenAI(
-            base_url=os.getenv("OPENAI_API_BASE"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=os.getenv("OPENAI_MODEL_NAME"),
-            temperature=os.getenv("OPENAI_TEMPERATURE"),
-        )
+        llm = cls._build_llm()
         # 3. 构建链应用
         summary_chain = prompt | llm | StrOutputParser()
         # 4.调用链并获取新摘要信息
@@ -62,13 +72,9 @@ class ConversationService(BaseService):
         ])
 
         # 2. 构建大语言模型
-        llm = ChatOpenAI(
-            base_url=os.getenv("OPENAI_API_BASE"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=os.getenv("OPENAI_MODEL_NAME"),
-            temperature=os.getenv("OPENAI_TEMPERATURE"),
-        )
-        structured_llm = llm.with_structured_output(ConversationInfo)
+        llm = cls._build_llm()
+        # method指定为function_calling，兼容Moonshot等不支持json_schema结构化输出的模型提供商
+        structured_llm = llm.with_structured_output(ConversationInfo, method="function_calling")
 
         # 3. # 构建链
         structured_chain = prompt | structured_llm
@@ -78,8 +84,12 @@ class ConversationService(BaseService):
 
         query = query.replace("\n", " ")
 
-        # 4. 调用并清理结果
-        conversation_info = structured_chain.invoke({"query": query})
+        # 4. 调用并清理结果，若模型未返回合法结构则回退到默认会话名
+        try:
+            conversation_info = structured_chain.invoke({"query": query})
+        except Exception as e:
+            logging.exception(f"生成会话名称出错, 错误信息: {str(e)}")
+            return "新会话"
 
         # 6.提取会话名称
         name = "新会话"
@@ -104,18 +114,18 @@ class ConversationService(BaseService):
         ])
 
         # 2. 构建llm
-        llm = ChatOpenAI(
-            base_url=os.getenv("OPENAI_API_BASE"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=os.getenv("OPENAI_MODEL_NAME"),
-            temperature=os.getenv("OPENAI_TEMPERATURE"),
-        )
+        llm = cls._build_llm()
 
-        structured_llm = llm.with_structured_output(SuggestedQuestions)
+        # method指定为function_calling，兼容Moonshot等不支持json_schema结构化输出的模型提供商
+        structured_llm = llm.with_structured_output(SuggestedQuestions, method="function_calling")
         # 构建链应用
         chain = prompt | structured_llm
-        # 4.调用链并获取建议问题列表
-        suggested_questions = chain.invoke({"history": history})
+        # 4.调用链并获取建议问题列表，若模型未返回合法结构则回退到空列表
+        try:
+            suggested_questions = chain.invoke({"history": history})
+        except Exception as e:
+            logging.exception(f"生成建议问题出错, 错误信息: {str(e)}")
+            return []
 
         # 5.提取建议问题列表
         questions = []
@@ -139,6 +149,7 @@ class ConversationService(BaseService):
             conversation_id: UUID,
             message_id: UUID,
             agent_thoughts: list[AgentThought],
+            invoke_from: InvokeFrom = InvokeFrom.DEBUGGER,
     ):
         """存储智能体推理步骤消息"""
         with flask_app.app_context():
@@ -170,7 +181,7 @@ class ConversationService(BaseService):
                         app_id=app_id,
                         conversation_id=conversation.id,
                         message_id=message.id,
-                        invoke_from=InvokeFrom.DEBUGGER,
+                        invoke_from=invoke_from,
                         created_by=account_id,
                         position=position,
                         event=agent_thought.event,
