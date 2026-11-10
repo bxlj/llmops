@@ -8,7 +8,6 @@ from typing import Any
 
 from jinja2 import Template
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
 
 from internal.core.workflow.entities.node_entity import NodeResult, NodeStatus
 from internal.core.workflow.entities.workflow_entity import WorkflowState
@@ -33,11 +32,12 @@ class LLMNode(BaseNode):
         # 5.使用jinja2格式模板信息
         prompt_value = Template(self.node_data.prompt).render(**inputs_dict)
 
-        # todo:6.根据配置创建LLM实例，等待多LLM接入时需要完善
-        llm = ChatOpenAI(
-            model=self.node_data.language_model_config.get("model", "kimi-k2.6"),
-            **self.node_data.language_model_config.get("parameters", {}),
-        )
+        # 6.根据配置创建LLM实例，等待多LLM接入时需要完善
+        from app.http.model import injector
+        from internal.service.language_model_service import LanguageModelService
+
+        language_model = injector.get(LanguageModelService)
+        llm = language_model.load_language_model(self.node_data.language_model_config)
 
         # 7.使用stream来代替invoke，避免接口长时间未响应超时
         content = ""

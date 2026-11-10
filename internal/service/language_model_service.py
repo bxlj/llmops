@@ -12,8 +12,10 @@ from flask import current_app
 from injector import inject
 
 from internal.core.language_model import LanguageModelManager
+from internal.core.language_model.entities.model_entity import BaseLanguageModel
+from internal.core.language_model.providers.moonshot.chat import Chat
 from internal.exception import NotFoundException
-from internal.service import BaseService
+from .base_service import BaseService
 
 
 @inject
@@ -43,7 +45,7 @@ class LanguageModelService(BaseService):
                 "background": provider_entity.background,
                 "support_model_types": provider_entity.supported_model_types,
                 "models": [{
-                    "model": model_entity.model_name,
+                    "model_name": model_entity.model_name,
                     "label": model_entity.label,
                     "model_type": model_entity.model_type,
                     "context_window": model_entity.context_window,
@@ -80,29 +82,28 @@ class LanguageModelService(BaseService):
         if not model_entity:
             raise NotFoundException("该模型不存在")
 
+        # 注意：前端直接读取resp.data.parameters，模型详情必须是扁平结构，不能再包一层"models"
         language_model = {
-            "models": {
-                "model": model_entity.model_name,
-                "label": model_entity.label,
-                "model_type": model_entity.model_type,
-                "context_window": model_entity.context_window,
-                "max_output_tokens": model_entity.max_output_tokens,
-                "features": model_entity.features,
-                "metadata": model_entity.metadata,
-                "attributes": model_entity.attributes,
-                "parameters": [{
-                    "name": parameter.name,
-                    "label": parameter.label,
-                    "type": parameter.type,
-                    "help": parameter.help,
-                    "required": parameter.required,
-                    "default": parameter.default,
-                    "min": parameter.min,
-                    "max": parameter.max,
-                    "precision": parameter.precision,
-                    "options": [{"label": option.label, "value": option.value} for option in parameter.options],
-                } for parameter in model_entity.parameters]
-            }
+            "model": model_entity.model_name,
+            "label": model_entity.label,
+            "model_type": model_entity.model_type,
+            "context_window": model_entity.context_window,
+            "max_output_tokens": model_entity.max_output_tokens,
+            "features": model_entity.features,
+            "metadata": model_entity.metadata,
+            "attributes": model_entity.attributes,
+            "parameters": [{
+                "name": parameter.name,
+                "label": parameter.label,
+                "type": parameter.type,
+                "help": parameter.help,
+                "required": parameter.required,
+                "default": parameter.default,
+                "min": parameter.min,
+                "max": parameter.max,
+                "precision": parameter.precision,
+                "options": [{"label": option.label, "value": option.value} for option in parameter.options],
+            } for parameter in model_entity.parameters]
         }
         return language_model
 
@@ -131,3 +132,29 @@ class LanguageModelService(BaseService):
         with open(icon_path, "rb") as f:
             byte_data = f.read()
             return byte_data, mimetype
+
+    def load_language_model(self, model_config: dict[str, Any]) -> BaseLanguageModel:
+        """根据model_config信息加载大语言模型，返回其实例"""
+        try:
+            provider_name = model_config.get("provider", "")
+            model_name = model_config.get("model", "")
+            parameters = model_config.get("parameters", {})
+
+            # 1.获取实体信息
+            provider = self.language_model_manager.get_provider(provider_name)
+            model_entity = provider.get_model_entity(model_name)
+            model_class = provider.get_model_class(model_entity.model_type)
+
+            # 2. 实例化model_class
+            return model_class(
+                **model_entity.attributes,
+                **parameters,
+                features=model_entity.features,
+                metadata=model_entity.metadata
+            )
+        except Exception as e:
+            return self.load_default_language_model
+
+    @classmethod
+    def load_default_language_model(cls) -> BaseLanguageModel:
+        return Chat(model="kimi-k2.6", temperature=1, )

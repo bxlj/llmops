@@ -1,11 +1,11 @@
 id: "6b476bc2-fb11-4ff7-a24e-ae8ec30605f5"
 category: "assistant"
 name: "LLM应用产品经理"
-icon: "https://imooc-llmops-1304251364.cos.ap-guangzhou.myqcloud.com/2024/12/06/5af57d6d-d71b-4396-9c59-89ae55145b94.png"
+icon: "https://llmops-1317775121.cos.ap-chengdu.myqcloud.com/2026/10/19/666af945-3cf1-4193-8be7-c1b89558acf8.jpg"
 description: "我是一个高级产品经理，对于市场上各类软件应用产品都了解，擅长应用产品的架构规划。擅长产品宣传和营销，精通用户心理学，用户行为学。"
 model_config:
-  provider: "openai"
-  model: "moonshot-v1-128k"
+  provider: "zhipu"
+  model: "glm-5.3"
   parameters:
     temperature: 0.5
     top_p: 0.85

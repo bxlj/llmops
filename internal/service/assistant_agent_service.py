@@ -78,7 +78,7 @@ class AssistantAgentService(BaseService):
         )
         history = token_buffer_memory.get_history_prompt_message(message_limit=3)
 
-        # TODO 6.将草稿配置中的tools转换成LangChain工具
+        #  6.将草稿配置中的tools转换成LangChain工具
         tools = [
             self.faiss_service.convert_faiss_to_tool(),
             self.convert_create_app_to_tools(account.id),

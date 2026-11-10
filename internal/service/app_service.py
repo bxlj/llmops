@@ -19,7 +19,6 @@ from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel
-from langchain_openai import ChatOpenAI
 from redis import Redis
 from sqlalchemy import func, desc
 from werkzeug.datastructures import FileStorage
@@ -42,6 +41,7 @@ from internal.model import (
 from internal.schema.app_schema import CreateAppReq, GetPublishHistoriesWithPage, \
     GetDebugConversationMessagesWithPageReq, GetAppWithPageReq
 from internal.service.cos_service import CosService
+from internal.service.language_model_service import LanguageModelService
 from internal.service.retrieval_service import RetrievalService
 from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
@@ -71,6 +71,7 @@ class AppService(BaseService):
     api_provider_manager: ApiProviderManager
     retrieval_service: RetrievalService
     builtin_provider_manager: BuiltinProviderManager
+    language_model_service: LanguageModelService
 
     def auto_create_app(self, account_id: UUID, name: str, description: str) -> None:
         """用于创建辅助agent"""
@@ -437,14 +438,8 @@ class AppService(BaseService):
             status=MessageStatus.NORMAL,
         )
 
-        # todo:5.根据传递的model_config实例化不同的LLM模型，等待多LLM接入后该处会发生变化
-
-        llm = ChatOpenAI(
-            base_url=os.getenv("OPENAI_API_BASE"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=draft_app_config["model_config"]["model"],
-            **draft_app_config["model_config"]["parameters"],
-        )
+        # 5.根据传递的model_config实例化不同的LLM模型，等待多LLM接入后该处会发生变化
+        llm = self.language_model_service.load_language_model(draft_app_config["model_config"])
 
         # 6.实例化TokenBufferMemory用于提取短期记忆
         token_buffer_memory = TokenBufferMemory(
@@ -477,7 +472,8 @@ class AppService(BaseService):
             llm=llm,
             agent_config=AgentConfig(
                 user_id=account.id,
-                InvokeFrom=InvokeFrom.DEBUGGER,
+                invoke_from=InvokeFrom.DEBUGGER,
+                preset_prompt=draft_app_config["preset_prompt"],
                 enable_long_term_memory=draft_app_config["long_term_memory"]["enable"],
                 tools=tools,
                 review_config=draft_app_config["review_config"],

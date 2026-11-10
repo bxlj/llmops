@@ -9,10 +9,13 @@ from typing import Union, Any
 from flask import request
 from injector import inject
 
+from internal.core.language_model import LanguageModelManager
+from internal.core.language_model.entities.model_entity import ModelParameterType
 from internal.core.tool.api_tools.entities import ToolEntity
 from internal.core.tool.api_tools.providers import ApiProviderManager
 from internal.core.tool.builtin_tools.providers import BuiltinProviderManager
-from internal.lib.helper import datetime_to_timestamp
+from internal.entity.app_entity import DEFAULT_APP_CONFIG
+from internal.lib.helper import datetime_to_timestamp, get_value_type
 from internal.model import App, Dataset, ApiTool, AppConfig, AppConfigVersion, AppDatasetJoin
 from pkg.sqlalchemy import SQLAlchemy
 from .base_service import BaseService
@@ -26,12 +29,16 @@ class AppConfigService(BaseService):
     db: SQLAlchemy
     api_provider_manager: ApiProviderManager
     builtin_provider_manager: BuiltinProviderManager
+    language_model_manager: LanguageModelManager
 
     def get_draft_app_config(self, app: App):
         # 2. 获取草稿配置信息
         draft_app_config = app.draft_app_config
 
-        # todo:3.校验model_config配置信息，等待多LLM实现的时候再来完成
+        # 3. 校验model_config配置信息，如果发生错误则使用默认配置信息（宽松校验）
+        validate_model_config = self._process_and_validate_model_config(draft_app_config.model_config)
+        if validate_model_config != draft_app_config.model_config:
+            self.update(draft_app_config, model_config=validate_model_config)
 
         # 4. 获取获取草稿配置信息中的工具字段
         draft_tools = draft_app_config.tools
@@ -54,14 +61,18 @@ class AppConfigService(BaseService):
         workflows = []
 
         # 20.将数据转换成字典后返回
-        return self._process_and_transformer_app_config(tools, workflows, datasets, draft_app_config)
+        return self._process_and_transformer_app_config(validate_model_config, tools, workflows, datasets,
+                                                        draft_app_config)
 
     def get_app_config(self, app: App) -> dict[str, Any]:
         """根据传递的应用获取该应用的运行配置"""
         # 1.提取应用的草稿配置
         app_config = app.app_config
 
-        # todo:2.校验model_config配置信息，等待多LLM实现的时候再来完成
+        # 2.校验model_config配置信息，如果运行时model_config发生变化，则更新model_config信息
+        validate_model_config = self._process_and_validate_model_config(app_config.model_config)
+        if app_config.model_config != validate_model_config:
+            self.update(app_config, model_config=validate_model_config)
 
         # 3.循环遍历工具列表删除已经被删除的工具信息
         tools, validate_tools = self._process_and_validate_tools(app_config.tools)
@@ -85,11 +96,12 @@ class AppConfigService(BaseService):
         workflows = []
 
         # 20.将数据转换成字典后返回
-        return self._process_and_transformer_app_config(tools, workflows, datasets, app_config)
+        return self._process_and_transformer_app_config(validate_model_config, tools, workflows, datasets, app_config)
 
     @classmethod
     def _process_and_transformer_app_config(
             cls,
+            model_config: dict[str, Any],
             tools: list[dict],
             workflows: list[dict],
             datasets: list[dict],
@@ -98,7 +110,7 @@ class AppConfigService(BaseService):
         """根据传递的插件列表、工作流列表、知识库列表以及应用配置创建字典信息"""
         return {
             "id": str(app_config.id),
-            "model_config": app_config.model_config,
+            "model_config": model_config,
             "dialog_round": app_config.dialog_round,
             "preset_prompt": app_config.preset_prompt,
             "tools": tools,
@@ -259,3 +271,77 @@ class AppConfigService(BaseService):
                     )
                 )
         return tools
+
+    def _process_and_validate_model_config(self, origin_model_config: dict) -> dict[str, Any]:
+        """校验模型配置信息是否正确"""
+        # 1. 判断model_config是否为字典类型，不是返回默认值
+        if not isinstance(origin_model_config, dict):
+            return DEFAULT_APP_CONFIG["model_config"]
+
+        # 2.提取origin_model_config中provider、model、parameters对应的信息
+        model_config = {
+            "provider": origin_model_config.get("provider", ""),
+            "model": origin_model_config.get("model", ""),
+            "parameters": origin_model_config.get("parameters", {}),
+        }
+
+        # 3.判断provider是否存在、类型是否正确，如果不符合规则则返回默认值
+        if not model_config.get("provider") or not isinstance(model_config["provider"], str):
+            return DEFAULT_APP_CONFIG["model_config"]
+        provider = self.language_model_manager.get_provider(model_config["provider"])
+        if not provider:
+            return DEFAULT_APP_CONFIG["model_config"]
+
+        # 4.判断model是否存在、类型是否正确，如果不符合则返回默认值
+        if not model_config["model"] or not isinstance(model_config["model"], str):
+            return DEFAULT_APP_CONFIG["model_config"]
+        model_entity = provider.get_model_entity(model_config["model"])
+        if not model_entity:
+            return DEFAULT_APP_CONFIG["model_config"]
+
+        # 5.判断parameters信息类型是否错误，如果错误则设置为默认值
+        if not model_config["parameters"] or not isinstance(model_config["parameters"], dict):
+            model_config["parameters"] = {
+                parameter.name: parameter.default
+                for parameter in model_entity.parameters
+            }
+
+        # 6.剔除传递的多余的parameter，亦或者是少传递的参数使用默认值补上
+        parameters = {}
+        for parameter in model_entity.parameters:
+            # 7.从model_config中获取参数值，如果不存在则设置为默认值
+            parameter_value = model_config["parameters"].get(parameter.name, parameter.default)
+            # 8.判断参数是否必填
+            if parameter.required:
+                # 9.参数必填，则值不允许为None，如果为None则设置默认值
+                if parameter_value is None:
+                    parameter_value = parameter.default
+                else:
+                    # 10.值非空则校验数据类型是否正确，不正确则设置默认值
+                    if get_value_type(parameter_value) != parameter.type.value:
+                        parameter_value = parameter.default
+            else:
+                # 11.参数非必填，数据非空的情况下需要校验
+                if parameter_value is not None:
+                    if get_value_type(parameter_value) != parameter.type.value:
+                        parameter_value = parameter.default
+
+            # 12.判断参数是否存在options，如果存在则数值必须在options中选择
+            if parameter.options and parameter_value not in parameter.options:
+                parameter_value = parameter.default
+
+            # 13.参数类型为int/float，如果存在min/max时候需要校验
+            if parameter.type.value in [ModelParameterType.INT,
+                                        ModelParameterType.FLOAT] and parameter_value is not None:
+                # 14.校验数值的min/max
+                if (
+                        (parameter.min and parameter_value < parameter.min) or
+                        (parameter.max and parameter_value > parameter.max)
+                ):
+                    parameter_value = parameter.default
+            parameters[parameter.name] = parameter_value
+
+        # 15.完成数据校验，赋值parameters参数
+        model_config["parameters"] = parameters
+
+        return model_config

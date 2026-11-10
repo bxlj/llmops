@@ -31,7 +31,7 @@ class AppConfigType(str, Enum):
 # 应用默认配置信息
 DEFAULT_APP_CONFIG = {
     "model_config": {
-        "provider": "openai",
+        "provider": "moonshot",
         "model": "kimi-k2.6",
         "parameters": {
             "temperature": 1,

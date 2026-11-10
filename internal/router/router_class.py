@@ -384,11 +384,11 @@ class Router:
                         view_func=self.workflow_handler.cancel_publish_workflow)
 
         # 12 语言模型模块
-        bp.add_url_rule("/language_models",
+        bp.add_url_rule("/language-models",
                         view_func=self.language_model_handel.get_language_models)
-        bp.add_url_rule("/language_models/<string:provider_name>/<string:model_name>",
+        bp.add_url_rule("/language-models/<string:provider_name>/<string:model_name>",
                         view_func=self.language_model_handel.get_language_model)
-        bp.add_url_rule("/language_models/<string:provider_name>/icon",
+        bp.add_url_rule("/language-models/<string:provider_name>/icon",
                         view_func=self.language_model_handel.get_language_model_icon)
 
         # 13.辅助Agent模块

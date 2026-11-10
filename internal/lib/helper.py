@@ -91,3 +91,16 @@ def convert_model_to_dict(obj: Any, **kwargs) -> Any:
 
     # 8.对其他类型的字段，保持原样
     return obj
+
+
+def get_value_type(value: Any) -> Any:
+    """根据传递的值获取变量的类型，并将str和bool转换成string和boolean"""
+    # 1.计算变量值的类型转换为字符串
+    type_value = type(value).__name__
+
+    if type_value == "str":
+        return "string"
+    if type_value == "bool":
+        return "boolean"
+
+    return type_value

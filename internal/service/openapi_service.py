@@ -31,6 +31,7 @@ from ..entity.conversation_entity import InvokeFrom, MessageStatus
 from ..entity.dataset_entity import RetrievalSource
 from ..exception import NotFoundException, ForbiddenException
 from ..schema.openapi_schema import OpenAPIChatReq
+from internal.service.language_model_service import LanguageModelService
 
 
 @inject
@@ -42,6 +43,7 @@ class OpenAPIService(BaseService):
     retrieval_service: RetrievalService
     app_config_service: AppConfigService
     conversation_service: ConversationService
+    language_model_service:LanguageModelService
 
     def chat(self, req: OpenAPIChatReq, account: Account):
         """开放Chat对话口"""
@@ -95,15 +97,11 @@ class OpenAPIService(BaseService):
             "status": MessageStatus.NORMAL,
         })
 
-        # todo:6.根据传递的Model_config创建LLM实例，等待多LLM接入时需要调整
+        # 6.根据传递的Model_config创建LLM实例，等待多LLM接入时需要调整
+
         model_config = app_config["model_config"]
 
-        llm = ChatOpenAI(
-            base_url=os.getenv("OPENAI_API_BASE"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=model_config["model"],
-            **model_config["parameters"],
-        )
+        llm = self.language_model_service.load_language_model(model_config)
 
         # 7.实例化TokenBufferMemory用于提取短期记忆
         token_buffer_memory = TokenBufferMemory(
