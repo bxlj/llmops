@@ -4,7 +4,6 @@
 @File    : openapi_service.py
 """
 import json
-import os
 from dataclasses import dataclass
 from threading import Thread
 from typing import Generator
@@ -12,9 +11,11 @@ from typing import Generator
 from flask import current_app
 from injector import inject
 from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
 
+from internal.core.agent.agents.react_agent import ReACTAgent
+from internal.core.language_model.entities.model_entity import ModelFeature
 from internal.model import Account, Conversation, EndUser, Message
+from internal.service.language_model_service import LanguageModelService
 from pkg.response import Response
 from pkg.sqlalchemy import SQLAlchemy
 from . import ConversationService
@@ -31,7 +32,6 @@ from ..entity.conversation_entity import InvokeFrom, MessageStatus
 from ..entity.dataset_entity import RetrievalSource
 from ..exception import NotFoundException, ForbiddenException
 from ..schema.openapi_schema import OpenAPIChatReq
-from internal.service.language_model_service import LanguageModelService
 
 
 @inject
@@ -43,7 +43,7 @@ class OpenAPIService(BaseService):
     retrieval_service: RetrievalService
     app_config_service: AppConfigService
     conversation_service: ConversationService
-    language_model_service:LanguageModelService
+    language_model_service: LanguageModelService
 
     def chat(self, req: OpenAPIChatReq, account: Account):
         """开放Chat对话口"""
@@ -129,8 +129,9 @@ class OpenAPIService(BaseService):
             )
             tools.append(dataset_retrieval)
 
-        # todo:14.构建Agent智能体，目前暂时使用FunctionCallAgent
-        agent = FunctionCallAgent(
+        # 14.构建Agent智能体，目前暂时使用FunctionCallAgent
+        agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
+        agent = agent_class(
             llm=llm,
             agent_config=AgentConfig(
                 user_id=account.id,

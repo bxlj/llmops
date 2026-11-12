@@ -24,6 +24,8 @@ from sqlalchemy import func, desc
 from werkzeug.datastructures import FileStorage
 from zhipuai import ZhipuAI
 
+from internal.core.agent.agents.react_agent import ReACTAgent
+from internal.core.language_model.entities.model_entity import ModelFeature
 from internal.core.language_model.providers.zhipu.chat import Chat
 from internal.entity.ai_entity import OPTIMIZE_PROMPT_TEMPLATE
 from internal.entity.app_entity import AppStatus, AppConfigType, DEFAULT_APP_CONFIG, GENERATE_ICON_PROMPT_TEMPLATE
@@ -467,8 +469,9 @@ class AppService(BaseService):
             )
             tools.append(dataset_retrieval)
 
-        # todo:12.构建Agent智能体，目前暂时使用FunctionCallAgent
-        agent = FunctionCallAgent(
+        # 12.构建Agent智能体，目前暂时使用FunctionCallAgent
+        agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
+        agent = agent_class(
             llm=llm,
             agent_config=AgentConfig(
                 user_id=account.id,

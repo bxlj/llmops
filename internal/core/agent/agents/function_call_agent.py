@@ -16,6 +16,7 @@ from langgraph.constants import END
 from langgraph.graph.state import CompiledStateGraph, StateGraph
 
 from internal.exception import FailException
+from language_model.entities.model_entity import ModelFeature
 from .base_agent import BaseAgent
 from ..entities.agent_entity import AgentState, AGENT_SYSTEM_PROMPT_TEMPLATE, DATASET_RETRIEVAL_TOOL_NAME, \
     MAX_ITERATION_RESPONSE
@@ -155,7 +156,12 @@ class FunctionCallAgent(BaseAgent):
         llm = self.llm
 
         # 3.检测大语言模型实例是否有bind_tools方法，如果没有则不绑定，如果有还需要检测tools是否为空，不为空则绑定
-        if hasattr(llm, "bind_tools") and callable(getattr(llm, "bind_tools")) and len(self.agent_config.tools) > 0:
+        if (
+            ModelFeature.TOOL_CALL in llm.features
+            and hasattr(llm, "bind_tools")
+            and callable(getattr(llm, "bind_tools"))
+            and len(self.agent_config.tools) > 0
+        ) :
             llm = llm.bind_tools(self.agent_config.tools, strict=False)
 
         # 4.流式调用LLM输出对应内容
