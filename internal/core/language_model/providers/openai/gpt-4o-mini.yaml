@@ -9,6 +9,12 @@ context_window: 128000
 max_output_tokens: 16384
 attributes:
   model: gpt-4o-mini
+metadata:
+  pricing:
+    input: 0.0011
+    output: 0.0043
+    unit: 0.001
+    currency: RMB
 parameters:
   - name: temperature
     use_template: temperature

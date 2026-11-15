@@ -8,6 +8,12 @@ context_window: 131072
 max_output_tokens: 8192
 attributes:
   model: qwen3.8-max
+metadata:
+  pricing:
+    input: 0.0200
+    output: 0.0600
+    unit: 0.001
+    currency: RMB
 parameters:
   - name: temperature
     use_template: temperature

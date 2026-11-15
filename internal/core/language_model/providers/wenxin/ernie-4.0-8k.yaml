@@ -7,6 +7,12 @@ context_window: 8192
 max_output_tokens: 2048
 attributes:
   model: ERNIE-4.0-8K
+metadata:
+  pricing:
+    input: 0.0300
+    output: 0.0900
+    unit: 0.001
+    currency: RMB
 parameters:
   - name: temperature
     use_template: temperature

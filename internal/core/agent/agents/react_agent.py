@@ -12,13 +12,13 @@ import uuid
 from langchain_core.messages import SystemMessage, messages_to_dict, HumanMessage, RemoveMessage, AIMessage
 from langchain_core.tools import render_text_description_and_args
 
-from agent.entities.agent_entity import MAX_ITERATION_RESPONSE
-from exception import FailException
 from internal.core.agent.agents import FunctionCallAgent
 from internal.core.agent.entities.agent_entity import AgentState, AGENT_SYSTEM_PROMPT_TEMPLATE, \
     REACT_AGENT_SYSTEM_PROMPT_TEMPLATE
+from internal.core.agent.entities.agent_entity import MAX_ITERATION_RESPONSE
 from internal.core.agent.entities.queue_entity import AgentThought, QueueEvent
 from internal.core.language_model.entities.model_entity import ModelFeature
+from internal.exception import FailException
 
 
 class ReACTAgent(FunctionCallAgent):
@@ -141,13 +141,13 @@ class ReACTAgent(FunctionCallAgent):
                 review_config = self.agent_config.review_config
                 content = chunk.content
                 if review_config["enable"] and review_config["outputs_config"]["enable"]:
-                    for keyword in review_config["outputs_config"]["keywords"]:
+                    for keyword in review_config["keywords"]:
                         content = re.sub(re.escape(keyword), "**", content, flags=re.IGNORECASE)
 
                 self.agent_queue_manager.publish(
                     state["task_id"],
                     AgentThought(
-                        id=uuid.uuid4(),
+                        id=id,
                         task_id=state["task_id"],
                         thought=content,
                         event=QueueEvent.AGENT_MESSAGE,
@@ -179,6 +179,17 @@ class ReACTAgent(FunctionCallAgent):
                             )
                         )
 
+        # 8.计算LLM的输入+输出token总数
+        input_token_count = self.llm.get_num_tokens_from_messages(state["messages"])
+        output_token_count = self.llm.get_num_tokens_from_messages([gathered])
+
+        # 9.获取输入/输出价格和单位
+        input_price, output_price, unit = self.llm.get_pricing()
+
+        # 10.计算总token+总成本
+        total_token_count = input_token_count + output_token_count
+        total_price = (input_token_count * input_price + output_token_count * output_price) * unit
+
         # 12.如果类型为推理则解析json,并添加智能体消息
         if generation_type == "thought":
             try:
@@ -197,8 +208,21 @@ class ReACTAgent(FunctionCallAgent):
                     id=id,
                     task_id=state["task_id"],
                     event=QueueEvent.AGENT_THOUGHT,
-                    message=messages_to_dict(state["messages"]),
                     thought=json.dumps(tool_calls),
+                    # 消息相关片段
+                    message=messages_to_dict(state["messages"]),
+                    message_price_unit=unit,
+                    message_token_count=input_token_count,
+                    message_unit_price=input_price,
+                    # 答案相关字段
+                    answer="",
+                    answer_price_unit=unit,
+                    answer_token_count=output_token_count,
+                    answer_unit_price=input_price,
+                    # Agent推理统计相关
+                    total_token_count=total_token_count,
+                    total_price=total_price,
+
                     latency=(time.perf_counter() - start_time),
                 ))
                 return {
@@ -219,12 +243,32 @@ class ReACTAgent(FunctionCallAgent):
                         latency=(time.perf_counter() - start_time),
                     )
                 )
-        # 14. 如果最终类型是message则表示已经拿到最终答案，则停止监听
+        # 14. 如果最终类型是message则表示已经拿到最终答案，则推送一条空内容并展示统计数据，同时停止监听
         if generation_type == "message":
+            self.agent_queue_manager.publish(state["task_id"], AgentThought(
+                id=id,
+                task_id=state["task_id"],
+                event=QueueEvent.AGENT_MESSAGE,
+                thought="",
+                # 消息相关字段
+                message=messages_to_dict(state["messages"]),
+                message_token_count=input_token_count,
+                message_unit_price=input_price,
+                message_price_unit=unit,
+                # 答案相关字段
+                answer="",
+                answer_token_count=output_token_count,
+                answer_unit_price=output_price,
+                answer_price_unit=unit,
+                # Agent推理统计相关
+                total_token_count=total_token_count,
+                total_price=total_price,
+                latency=(time.perf_counter() - start_time),
+            ))
             self.agent_queue_manager.publish(state["task_id"], AgentThought(
                 id=id,
                 task_id=state["task_id"],
                 event=QueueEvent.AGENT_END
             ))
-        
+
         return {"messages": [gathered], "iteration_count": state["iteration_count"] + 1}

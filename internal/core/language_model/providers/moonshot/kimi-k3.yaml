@@ -9,6 +9,12 @@ context_window: 1048576
 max_output_tokens: 65536
 attributes:
   model: kimi-k3
+metadata:
+  pricing:
+    input: 0.0040
+    output: 0.0160
+    unit: 0.001
+    currency: RMB
 parameters:
   - name: max_tokens
     use_template: max_completion_tokens

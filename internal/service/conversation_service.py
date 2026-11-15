@@ -4,7 +4,6 @@
 @File    : conversation_service.py
 """
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -16,6 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from internal.core.agent.entities.queue_entity import AgentThought, QueueEvent
+from internal.core.language_model.providers.zhipu.chat import Chat
 from internal.entity.conversation_entity import SUMMARIZER_TEMPLATE, CONVERSATION_NAME_TEMPLATE, ConversationInfo, \
     SUGGESTED_QUESTIONS_TEMPLATE, SuggestedQuestions, InvokeFrom
 from internal.model import Conversation, Message
@@ -37,11 +37,8 @@ class ConversationService(BaseService):
         (tool_choice=required)，与with_structured_output的function_calling通道互斥，
         这类轻量任务也不需要深度推理，因此统一通过extra_body关闭thinking。
         """
-        return ChatOpenAI(
-            base_url=os.getenv("OPENAI_API_BASE"),
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=os.getenv("OPENAI_MODEL_NAME"),
-            extra_body={"thinking": {"type": "disabled"}},
+        return Chat(
+            model="GLM-5.3-Flash",
         )
 
     @classmethod
@@ -189,8 +186,20 @@ class ConversationService(BaseService):
                         observation=agent_thought.observation,
                         tool=agent_thought.tool,
                         tool_input=agent_thought.tool_input,
+
+                        # 消息相关数据
                         message=agent_thought.message,
+                        message_token_count=agent_thought.message_token_count,
+                        message_unit_price=agent_thought.message_unit_price,
+                        message_price_unit=agent_thought.message_price_unit,
+                        # 答案相关字段
                         answer=agent_thought.answer,
+                        answer_token_count=agent_thought.answer_token_count,
+                        answer_unit_price=agent_thought.answer_unit_price,
+                        answer_price_unit=agent_thought.answer_price_unit,
+                        # Agent推理统计相关
+                        total_token_count=agent_thought.total_token_count,
+                        total_price=agent_thought.total_price,
                         latency=agent_thought.latency,
                     )
 
@@ -199,8 +208,19 @@ class ConversationService(BaseService):
                     # 8.更新消息信息
                     self.update(
                         message,
+                        # 消息相关字段
                         message=agent_thought.message,
+                        message_token_count=agent_thought.message_token_count,
+                        message_unit_price=agent_thought.message_unit_price,
+                        message_price_unit=agent_thought.message_price_unit,
+                        # 答案相关字段
                         answer=agent_thought.answer,
+                        answer_token_count=agent_thought.answer_token_count,
+                        answer_unit_price=agent_thought.answer_unit_price,
+                        answer_price_unit=agent_thought.answer_price_unit,
+                        # Agent推理统计相关
+                        total_token_count=agent_thought.total_token_count,
+                        total_price=agent_thought.total_price,
                         latency=latency,
                     )
 
