@@ -6,6 +6,7 @@
 
 from .account_handler import AccountHandler
 from .ai_handle import AIHandler
+from .analysis_handle import AnalysisHandle
 from .api_key_handler import ApiKeyHandler
 from .api_tool_handle import ApiToolHandler
 from .app_handler import AppHandler
@@ -40,5 +41,6 @@ __all__ = ["AppHandler",
            "BuiltInAppHandler",
            "WorkflowHandler",
            "LanguageModelHandel",
-           "AssistantAgentHandler"
+           "AssistantAgentHandler",
+           "AnalysisHandle",
            ]
