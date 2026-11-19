@@ -82,9 +82,9 @@ class BaseLanguageModel(LCBaseLanguageModel, ABC):
     def get_pricing(self) -> tuple[float, float, float]:
         """获取LLM对应的价格信息，返回的数据格式是（输入价格，输出价格，单位）"""
         # 1. 计算获取输入价格，输出价格，单位
-        input_price = self.metadata.get("pricing").get("input", 0.0)
-        output_price = self.metadata.get("pricing").get("output", 0.0)
-        unit = self.metadata.get("pricing").get("unit", 0.0)
+        input_price = self.metadata.get("pricing", {}).get("input", 0.0)
+        output_price = self.metadata.get("pricing", {}).get("output", 0.0)
+        unit = self.metadata.get("pricing", {}).get("unit", 0.0)
 
         # 2. 返回数据
         return input_price, output_price, unit

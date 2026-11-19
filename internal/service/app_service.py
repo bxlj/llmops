@@ -29,6 +29,7 @@ from internal.core.language_model.entities.model_entity import ModelFeature
 from internal.core.language_model.providers.zhipu.chat import Chat
 from internal.entity.ai_entity import OPTIMIZE_PROMPT_TEMPLATE
 from internal.entity.app_entity import AppStatus, AppConfigType, DEFAULT_APP_CONFIG, GENERATE_ICON_PROMPT_TEMPLATE
+from internal.entity.workflow_entity import WorkflowStatus
 from internal.model import (
     App,
     Account,
@@ -40,6 +41,7 @@ from internal.model import (
     Conversation,
     Message,
 )
+from internal.model import Workflow
 from internal.schema.app_schema import CreateAppReq, GetPublishHistoriesWithPage, \
     GetDebugConversationMessagesWithPageReq, GetAppWithPageReq
 from internal.service.cos_service import CosService
@@ -250,7 +252,7 @@ class AppService(BaseService):
                 }
                 for tool in draft_app_config["tools"]
             ],
-            workflows=draft_app_config["workflows"],
+            workflows=[workflow["id"] for workflow in draft_app_config["workflows"]],
             retrieval_config=draft_app_config["retrieval_config"],
             long_term_memory=draft_app_config["long_term_memory"],
             opening_statement=draft_app_config["opening_statement"],
@@ -469,6 +471,13 @@ class AppService(BaseService):
             )
             tools.append(dataset_retrieval)
 
+        # 检测是否关联工作流信息，如果关联，将工作流转换为BaseTool加入tools
+        if draft_app_config["workflows"]:
+            workflow_tools = self.app_config_service.get_langchain_tools_by_workflow_ids(
+                [workflow["id"] for workflow in draft_app_config["workflows"]],
+            )
+            tools.extend(workflow_tools)
+
         # 12.构建Agent智能体，目前暂时使用FunctionCallAgent
         agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
         agent = agent_class(
@@ -505,7 +514,7 @@ class AppService(BaseService):
                             "thought": agent_thoughts[event_id].thought + agent_thought.thought,
                             # 消息相关数据
                             "message": agent_thought.message,
-                            "message_token_count":agent_thought.message_token_count,
+                            "message_token_count": agent_thought.message_token_count,
                             "message_price_unit": agent_thought.message_price_unit,
                             "message_unit_price": agent_thought.message_unit_price,
                             # 答案相关数据
@@ -514,8 +523,8 @@ class AppService(BaseService):
                             "answer_price_unit": agent_thought.answer_price_unit,
                             "answer_unit_price": agent_thought.answer_unit_price,
                             # Agent推理相关统计
-                            "total_token_count":agent_thought.total_token_count,
-                            "total_price":agent_thought.total_price,
+                            "total_token_count": agent_thought.total_token_count,
+                            "total_price": agent_thought.total_price,
 
                             "latency": agent_thought.latency,
                         })
@@ -760,9 +769,37 @@ class AppService(BaseService):
             # 6.11 重新赋值工具
             draft_app_config["tools"] = validate_tools
 
-        # todo:7.校验workflows，等待工作流模块完成后实现
+        # 7. 检验workflow，提取已发布+权限正常的工作流列表进行绑定（更新配置阶段不校验工作流是否可以正常运行）
         if "workflows" in draft_app_config:
-            draft_app_config["workflows"] = []
+            workflows = draft_app_config["workflows"]
+
+            # 7.1 判断workflows是否是列表
+            if not isinstance(workflows, list):
+                raise ValidateErrorException("绑定的工作流列表参数格式错误")
+
+            # 7.2 判断关联的工作流是否超过五个
+            if len(workflows) > 5:
+                raise ValidateErrorException("Agent绑定的工作流不能超过5个")
+
+            # 7.3 循环校验工作流参数，必须为UUID
+            for workflow_id in workflows:
+                try:
+                    UUID(workflow_id)
+                except Exception as e:
+                    raise ValidateErrorException("工作流参数必须是UUID")
+
+            # 7.4 判断是否重复关联了工作流
+            if len(set(workflows)) != len(workflows):
+                raise ValidateErrorException("绑定工作流存在重复")
+            # 7.5 校验工作流的权限，剔除不属于当前账号，亦或未发布的工作流
+            workflow_records = self.db.session.query(Workflow).filter(
+                Workflow.id.in_(workflows),
+                Workflow.status == WorkflowStatus.PUBLISHED
+            ).all()
+
+            workflow_sets = set([str(workflow_record.id) for workflow_record in workflow_records])
+
+            draft_app_config["workflows"] = [workflow_id for workflow_id in workflows if workflow_id in workflow_sets]
 
         # 8.校验datasets知识库列表
         if "datasets" in draft_app_config:

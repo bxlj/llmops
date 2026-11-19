@@ -129,6 +129,13 @@ class OpenAPIService(BaseService):
             )
             tools.append(dataset_retrieval)
 
+        # 检测是否关联工作流信息，如果关联，将工作流转换为BaseTool加入tools
+        if app_config["workflows"]:
+            workflow_tools = self.app_config_service.get_langchain_tools_by_workflow_ids(
+                [workflow["id"] for workflow in app_config["workflows"]],
+            )
+            tools.extend(workflow_tools)
+
         # 14.构建Agent智能体，目前暂时使用FunctionCallAgent
         agent_class = FunctionCallAgent if ModelFeature.TOOL_CALL in llm.features else ReACTAgent
         agent = agent_class(
