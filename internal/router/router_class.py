@@ -129,6 +129,16 @@ class Router:
             view_func=self.app_handler.get_debug_conversation_messages_with_page,
         )
 
+        bp.add_url_rule(
+            "/apps/<uuid:app_id>/published-config",
+            view_func=self.app_handler.get_published_token,
+        )
+
+        bp.add_url_rule(
+            "/apps/<uuid:app_id>/published-config/regenerate-web-app-token",
+            view_func=self.app_handler.regenerate_web_app_token,
+        )
+
         # 3.内置插件广场模块
         bp.add_url_rule("/builtin-tools", view_func=self.builtin_tool_handler.get_builtin_tools)
         bp.add_url_rule(

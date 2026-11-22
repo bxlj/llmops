@@ -680,6 +680,25 @@ class AppService(BaseService):
 
         return new_app
 
+    def get_published_token(self, app_id: UUID, account: Account) -> dict[str, Any]:
+        """获取指定发布应用的token"""
+        app = self.get_app(app_id, account)
+
+        return {
+            "web_app": {
+                "token": app.token_with_default,
+                "status": app.status,
+            }
+        }
+
+    def regenerate_web_app_token(self, app_id: UUID, account: Account) -> dict[str, Any]:
+        """重新生成WebApp的凭证标识"""
+        app = self.get_app(app_id, account)
+
+        return {
+            "token": app.token_with_default
+        }
+
     def _validate_draft_app_config(self, draft_app_config: dict[str, Any], account: Account) -> dict[str, Any]:
         """校验传递的应用草稿配置信息，返回校验后的数据"""
         # 1.校验上传的草稿配置中对应的字段，至少拥有一个可以更新的配置

@@ -6,6 +6,8 @@
 @File    : helper.py
 """
 import importlib
+import random
+import string
 from datetime import datetime
 from enum import Enum
 from hashlib import sha3_256
@@ -104,3 +106,9 @@ def get_value_type(value: Any) -> Any:
         return "boolean"
 
     return type_value
+
+def generate_random_str(length: int = 16) -> str:
+    """根据传递的长度，生成字符串"""
+    chars = string.ascii_letters + string.digits
+
+    return ''.join(random.choices(chars,k=length))
