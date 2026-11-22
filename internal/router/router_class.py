@@ -10,25 +10,16 @@ from flask import Flask, Blueprint
 from injector import inject
 
 from internal.handler import (
-    AppHandler,
-    BuiltinToolHandler,
-    ApiToolHandler,
-    UploadFileHandler,
-    DatasetHandler,
-    DocumentHandler,
-    SegmentHandler,
-    OAuthHandler,
-    AccountHandler,
-    AuthHandler,
-    UserHandler,
-    AIHandler,
-    ApiKeyHandler,
-    OpenAPIHandler,
-    BuiltInAppHandler,
-    WorkflowHandler,
-    LanguageModelHandel,
-    AssistantAgentHandler,
-    AnalysisHandle
+    AppHandler, BuiltinToolHandler,
+    ApiToolHandler, UploadFileHandler,
+    DatasetHandler, DocumentHandler,
+    SegmentHandler, OAuthHandler,
+    AccountHandler, AuthHandler,
+    UserHandler, AIHandler,
+    ApiKeyHandler, OpenAPIHandler,
+    BuiltInAppHandler, WorkflowHandler,
+    LanguageModelHandel, AssistantAgentHandler,
+    AnalysisHandle, WebAppHandler
 )
 
 
@@ -55,6 +46,7 @@ class Router:
     language_model_handel: LanguageModelHandel
     assistant_agent_handler: AssistantAgentHandler
     analysis_handler: AnalysisHandle
+    web_app_handler: WebAppHandler
 
     def register_router(self, app: Flask):
         """注册路由"""
@@ -428,6 +420,15 @@ class Router:
         bp.add_url_rule(
             "/analysis/<uuid:app_id>",
             view_func=self.analysis_handler.get_app_analysis,
+        )
+
+        # 15.WebApp模块
+        bp.add_url_rule("/web-apps/<string:token>", view_func=self.web_app_handler.get_app_by_token)
+
+        bp.add_url_rule(
+            "/web-apps/<string:token>/chat",
+            methods=["POST"],
+            view_func=self.web_app_handler.web_app_chat,
         )
 
         # 练习

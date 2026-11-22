@@ -106,7 +106,8 @@ class AppConfigService(BaseService):
             self.update(app_config, workflows=validate_workflows)
 
         # 8.将数据转换成字典后返回
-        return self._process_and_transformer_app_config(validate_model_config, tools, workflows, datasets, app_config)
+        return self._process_and_transformer_app_config(
+            validate_model_config, tools, workflows, datasets, app_config)
 
     @classmethod
     def _process_and_transformer_app_config(

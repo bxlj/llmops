@@ -12,26 +12,17 @@ from .auth_schema import PasswordLoginReq, PasswordLoginResp
 from .dataset_schema import (ValidateCreateDatasetReq, GetDatasetResp, GetDatasetWithPageRep,
                              GetDatasetsWithPageResp, UpdateDatasetReq)
 from .schema import ListField
+from .web_app_schema import GetAppByTokenResp, WebAppChatReq
 
-__all__ = ['ValidateOpenAPISchemaReq',
-           'ValidateCreateAPISchemaReq',
-           'ListField',
-           'GetApiToolProviderResp',
-           'GetApiToolResp',
-           'GetToolProviderWithPageReq',
-           'GetApiToolProvidersWithPageResp',
-           'UpdateAPISchemaReq',
-           'ValidateCreateDatasetReq',
-           'GetDatasetResp',
-           'GetDatasetWithPageRep',
-           'GetDatasetsWithPageResp',
-           'UpdateDatasetReq',
-           'CompletionReq',
-           'GetCurrentUserResp',
-           'UpdatePasswordReq',
-           'UpdateNameReq',
-           'UpdateAvatarReq',
-           'PasswordLoginReq',
-           'PasswordLoginResp',
-           'AssistantAgentChatReq'
+__all__ = ['ValidateOpenAPISchemaReq', 'ValidateCreateAPISchemaReq',
+           'ListField', 'GetApiToolProviderResp', 'GetApiToolResp',
+           'GetToolProviderWithPageReq', 'GetApiToolProvidersWithPageResp',
+           'UpdateAPISchemaReq', 'ValidateCreateDatasetReq',
+           'GetDatasetResp', 'GetDatasetWithPageRep',
+           'GetDatasetsWithPageResp', 'UpdateDatasetReq',
+           'CompletionReq', 'GetCurrentUserResp',
+           'UpdatePasswordReq', 'UpdateNameReq',
+           'UpdateAvatarReq', 'PasswordLoginReq',
+           'PasswordLoginResp', 'AssistantAgentChatReq',
+           'GetAppByTokenResp', 'WebAppChatReq',
            ]

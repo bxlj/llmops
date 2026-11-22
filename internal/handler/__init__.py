@@ -22,25 +22,17 @@ from .openapi_handler import OpenAPIHandler
 from .segment_handle import SegmentHandler
 from .upload_file_handle import UploadFileHandler
 from .user_handle import UserHandler
+from .web_app_handler import WebAppHandler
 from .workflow_handler import WorkflowHandler
 
-__all__ = ["AppHandler",
-           "BuiltinToolHandler",
-           "UploadFileHandler",
-           "OAuthHandler",
-           "AccountHandler",
-           "AuthHandler",
-           "DocumentHandler",
-           "DatasetHandler",
-           "ApiToolHandler",
-           "SegmentHandler",
-           "UserHandler",
-           "AIHandler",
-           "ApiKeyHandler",
-           "OpenAPIHandler",
-           "BuiltInAppHandler",
-           "WorkflowHandler",
-           "LanguageModelHandel",
-           "AssistantAgentHandler",
-           "AnalysisHandle",
+__all__ = ["AppHandler", "BuiltinToolHandler",
+           "UploadFileHandler", "OAuthHandler",
+           "AccountHandler", "AuthHandler",
+           "DocumentHandler", "DatasetHandler",
+           "ApiToolHandler", "SegmentHandler",
+           "UserHandler", "AIHandler", "ApiKeyHandler",
+           "OpenAPIHandler", "BuiltInAppHandler",
+           "WorkflowHandler", "LanguageModelHandel",
+           "AssistantAgentHandler", "AnalysisHandle",
+           "WebAppHandler"
            ]
