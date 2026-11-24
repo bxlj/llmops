@@ -5,6 +5,7 @@
 """
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -13,13 +14,19 @@ from injector import inject
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from sqlalchemy import desc
 
 from internal.core.agent.entities.queue_entity import AgentThought, QueueEvent
 from internal.core.language_model.providers.zhipu.chat import Chat
+from internal.entity.conversation_entity import MessageStatus
 from internal.entity.conversation_entity import SUMMARIZER_TEMPLATE, CONVERSATION_NAME_TEMPLATE, ConversationInfo, \
     SUGGESTED_QUESTIONS_TEMPLATE, SuggestedQuestions, InvokeFrom
+from internal.exception import NotFoundException
 from internal.model import Conversation, Message
+from internal.model.account import Account
 from internal.model.conversation import MessageAgentThought
+from internal.schema.conversation_schema import GetConversationWithPageReq
+from pkg.paginator import Paginator
 from pkg.sqlalchemy import SQLAlchemy
 from .base_service import BaseService
 
@@ -28,6 +35,118 @@ from .base_service import BaseService
 @dataclass
 class ConversationService(BaseService):
     db: SQLAlchemy
+
+    def get_conversations_with_page(
+            self,
+            conversation_id: UUID,
+            req: GetConversationWithPageReq,
+            account: Account
+    ) -> tuple[list[Message], Paginator]:
+        """获取会话列表信息"""
+        # 0. 获取会话信息
+        conversation = self.get_conversation(account, conversation_id)
+
+        # 1.构建分页器
+        paginator = Paginator(db=self.db, req=req)
+
+        # 2. 构建过滤条件
+        filters = []
+        if req.created_at.data:
+            # 3.将时间戳转换成DateTime
+            created_at_datetime = datetime.fromtimestamp(req.created_at.data)
+            filters.append(Message.created_at <= created_at_datetime)
+
+        # 4. 查询获取数据
+        messages = paginator.paginate(
+            self.db.session.query(Message).filter(
+                Message.conversation_id == conversation.id,
+                # Message.created_by == account.id,
+                Message.status.in_([MessageStatus.STOP, MessageStatus.NORMAL]),
+                Message.answer != "",
+                ~Message.is_deleted,
+                *filters,
+            ).order_by(desc("created_at"))
+        )
+
+        return messages, paginator
+
+    def delete_conversation(self, conversation_id: UUID, account: Account) -> Conversation:
+        """删除会话信息，同时删除消息记录"""
+        # 1. 判断当前会话信息状态
+        conversation = self.get_conversation(account, conversation_id)
+
+        # 2. 删除会话信息,修改会话状态is_delete
+        self.update(conversation, is_deleted=True)
+
+        return conversation
+
+    def delete_message(self, conversation_id: UUID, message_id: UUID, account: Account) -> Message:
+        """删除特定会话下的特定消息"""
+        # 1. 判断当前会话信息状态
+        conversation = self.get_conversation(account, conversation_id)
+
+        # 2. 获取特定的消息信息
+        message = self.get_message(message_id, account)
+        if message.conversation_id != conversation.id:
+            raise NotFoundException("该会话下不存在该消息，请核实后重试")
+
+        # 3. 删除会话下的特定消息
+        self.update(message, is_deleted=True)
+
+        return message
+
+    def get_conversation_name(self, conversation_id: UUID, account: Account) -> str:
+        """获取指定会话下的名称"""
+        # 1. 判断当前会话信息状态
+        conversation = self.get_conversation(account, conversation_id)
+
+        # 2. 获取会话名称
+        return conversation.name
+
+    def update_conversation_name(self, conversation_id: UUID, name: str, account: Account) -> Conversation:
+        """修改指定会话的名称"""
+        # 1. 判断当前会话信息状态
+        conversation = self.get_conversation(account, conversation_id)
+
+        # 2. 修改会话名称
+        self.update(conversation, name=name)
+
+        return conversation
+
+    def update_conversation_is_pinned(self, conversation_id: UUID, is_pinned: bool, account: Account) -> Conversation:
+        """置顶或取消置顶某个会话"""
+        # 1. 判断当前会话信息状态
+        conversation = self.get_conversation(account, conversation_id)
+        # 2. 修改置顶状态
+        self.update(conversation, is_pinned=is_pinned)
+        return conversation
+
+    def get_message(self, message_id: UUID, account: Account) -> Message:
+        """获取指定消息信息"""
+        message = self.get(Message, message_id)
+
+        if (
+                not message or
+                message.created_by != account.id or
+                message.is_deleted
+        ):
+            raise NotFoundException("消息不存在或消息已被删除")
+
+        return message
+
+    def get_conversation(self, account: Account, conversation_id: UUID) -> Conversation:
+        """获取指定会话信息"""
+        conversation = self.get(Conversation, conversation_id)
+
+        # 2.判断是否符合要求
+        if (
+                not conversation or
+                conversation.created_by != account.id or
+                conversation.is_deleted
+        ):
+            raise NotFoundException("当前会话信息不存在")
+
+        return conversation
 
     @classmethod
     def _build_llm(cls) -> ChatOpenAI:

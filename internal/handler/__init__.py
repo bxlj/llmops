@@ -14,6 +14,7 @@ from .assistant_agent_handler import AssistantAgentHandler
 from .auth_handler import AuthHandler
 from .builtin_app_handler import BuiltInAppHandler
 from .builtin_tool_handler import BuiltinToolHandler
+from .conversation_handler import ConversationHandler
 from .dataset_handle import DatasetHandler
 from .document_handle import DocumentHandler
 from .language_model_handle import LanguageModelHandel
@@ -34,5 +35,5 @@ __all__ = ["AppHandler", "BuiltinToolHandler",
            "OpenAPIHandler", "BuiltInAppHandler",
            "WorkflowHandler", "LanguageModelHandel",
            "AssistantAgentHandler", "AnalysisHandle",
-           "WebAppHandler"
+           "WebAppHandler", "ConversationHandler"
            ]

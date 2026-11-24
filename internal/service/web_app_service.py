@@ -12,23 +12,26 @@ from uuid import UUID
 from flask import current_app
 from injector import inject
 from langchain_core.messages import HumanMessage
+from sqlalchemy import desc
 
 from internal.core.agent.agents import FunctionCallAgent
+from internal.core.agent.agents.agent_queue_manager import AgentQueueManager
 from internal.core.agent.agents.react_agent import ReACTAgent
 from internal.core.agent.entities.agent_entity import AgentConfig
 from internal.core.agent.entities.queue_entity import QueueEvent
+from internal.core.language_model.entities.model_entity import ModelFeature
 from internal.core.memory.token_buffer_memory import TokenBufferMemory
 from internal.entity.app_entity import AppStatus
-from internal.entity.conversation_entity import InvokeFrom
+from internal.entity.conversation_entity import InvokeFrom, MessageStatus
 from internal.entity.dataset_entity import RetrievalSource
 from internal.exception import NotFoundException, ForbiddenException
 from internal.model.account import Account
 from internal.model.app import App
 from internal.model.conversation import Conversation, Message
 from internal.service.app_config_service import AppConfigService
+from internal.service.conversation_service import ConversationService
 from internal.service.language_model_service import LanguageModelService
 from internal.service.retrieval_service import RetrievalService
-from language_model.entities.model_entity import ModelFeature
 from pkg.sqlalchemy import SQLAlchemy
 from .base_service import BaseService
 
@@ -39,6 +42,7 @@ class WebAppService(BaseService):
     db: SQLAlchemy
     app_config_service: AppConfigService
     retrieval_service: RetrievalService
+    conversation_service: ConversationService
     language_model_service: LanguageModelService
 
     def get_app_by_token(self, token: str) -> App:
@@ -59,7 +63,7 @@ class WebAppService(BaseService):
             conversation = self.get(Conversation, conversation_id)
             if (
                     not conversation
-                    or app.id != conversation.id
+                    or app.id != conversation.app_id
                     or conversation.invoke_from != InvokeFrom.WEB_APP
                     or conversation.created_by != account.id
                     or conversation.is_deleted is True
@@ -67,7 +71,7 @@ class WebAppService(BaseService):
                 raise ForbiddenException("该会话不存在，或者不属于/用户/调用方式")
         else:
             # 3. 如果没有传递会话id,则创建一个新的会话
-            self.create(Conversation, **{
+            conversation = self.create(Conversation, **{
                 "app_id": app.id,
                 "name": "New Conversation",
                 "invoke_from": InvokeFrom.WEB_APP,
@@ -85,10 +89,11 @@ class WebAppService(BaseService):
             invoke_from=InvokeFrom.WEB_APP,
             created_by=account.id,
             query=query,
+            status=MessageStatus.NORMAL,
         )
 
         # 6. 根据配置信息创建llm对象
-        llm = self.language_model_service.load_language_model(app_config.get("model_config"), {})
+        llm = self.language_model_service.load_language_model(app_config.get("model_config", {}))
 
         # 7. 实例化TokenBufferMemory用于提取短期记忆
         token_buffer_memory = TokenBufferMemory(
@@ -111,15 +116,15 @@ class WebAppService(BaseService):
                 flask_app=current_app._get_current_object(),
                 dataset_ids=[dataset["id"] for dataset in app_config["datasets"]],
                 account_id=account.id,
-                retrieval_strategy=RetrievalSource.APP,
-                **app_config["retrieval_strategy"],
+                retrival_source=RetrievalSource.APP,
+                **app_config["retrieval_config"],
             )
             tools.append(dataset_retrieval)
 
         # 11. 检索是否关联工作流，如果关联工作流，则将工作信息构建成工具添加到tools中
         if app_config["workflows"]:
             workflow_tools = self.app_config_service.get_langchain_tools_by_workflow_ids(
-                [workflow.id for workflow in app_config["workflows"]],
+                [workflow["id"] for workflow in app_config["workflows"]],
             )
             tools.extend(workflow_tools)
 
@@ -202,3 +207,29 @@ class WebAppService(BaseService):
             }
         )
         thread.start()
+
+    def stop_web_app_chat(self, token: str, task_id: UUID, account: Account):
+        """根据传递的token+task_id停止与指定的webapp对话"""
+        # 1.获取WebApp应用校验是否已经发布
+        self.get_app_by_token(token)
+
+        # 2.使用智能体队列管理器停止对话
+        AgentQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, account.id)
+
+    def get_conversation(self, token: str, is_pinned: bool, account: Account) -> list[Conversation]:
+        """获取指定应用的会话列表"""
+        # 1.获取对应应用信息
+        app = self.get_app_by_token(token)
+
+        # 2. 获取conversion信息
+        conversations = self.db.session.query(Conversation).with_entities(
+            Conversation.id, Conversation.name, Conversation.summary, Conversation.created_at
+        ).filter(
+            Conversation.app_id == app.id,
+            Conversation.created_by == account.id,
+            Conversation.invoke_from == InvokeFrom.WEB_APP,
+            Conversation.is_pinned == is_pinned,
+            ~Conversation.is_deleted,
+        ).order_by(desc("created_at")).all()
+
+        return conversations

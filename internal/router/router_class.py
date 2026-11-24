@@ -19,7 +19,7 @@ from internal.handler import (
     ApiKeyHandler, OpenAPIHandler,
     BuiltInAppHandler, WorkflowHandler,
     LanguageModelHandel, AssistantAgentHandler,
-    AnalysisHandle, WebAppHandler
+    AnalysisHandle, WebAppHandler, ConversationHandler
 )
 
 
@@ -47,6 +47,7 @@ class Router:
     assistant_agent_handler: AssistantAgentHandler
     analysis_handler: AnalysisHandle
     web_app_handler: WebAppHandler
+    conversation_handler: ConversationHandler
 
     def register_router(self, app: Flask):
         """注册路由"""
@@ -128,6 +129,7 @@ class Router:
 
         bp.add_url_rule(
             "/apps/<uuid:app_id>/published-config/regenerate-web-app-token",
+            methods=["POST"],
             view_func=self.app_handler.regenerate_web_app_token,
         )
 
@@ -429,6 +431,51 @@ class Router:
             "/web-apps/<string:token>/chat",
             methods=["POST"],
             view_func=self.web_app_handler.web_app_chat,
+        )
+
+        bp.add_url_rule(
+            "/web-apps/<string:token>/chat/<uuid:task_id>/stop",
+            methods=["POST"],
+            view_func=self.web_app_handler.stop_web_app_chat,
+        )
+
+        bp.add_url_rule(
+            "/web-apps/<string:token>/conversations",
+            view_func=self.web_app_handler.get_conversation,
+        )
+
+        # 16.会话模块
+        bp.add_url_rule(
+            "/conversations/<uuid:conversation_id>/messages",
+            view_func=self.conversation_handler.get_conversation_messages_with_page,
+        )
+
+        bp.add_url_rule(
+            "/conversations/<uuid:conversation_id>/delete",
+            methods=["POST"],
+            view_func=self.conversation_handler.delete_conversation,
+        )
+
+        bp.add_url_rule(
+            "/conversations/<uuid:conversation_id>/messages/<uuid:message_id>/delete",
+            methods=["POST"],
+            view_func=self.conversation_handler.delete_message,
+        )
+
+        bp.add_url_rule(
+            "/conversations/<uuid:conversation_id>/name",
+            view_func=self.conversation_handler.get_conversation_name,
+        )
+        bp.add_url_rule(
+            "/conversations/<uuid:conversation_id>/name",
+            methods=["POST"],
+            view_func=self.conversation_handler.update_conversation_name,
+        )
+
+        bp.add_url_rule(
+            "/conversations/<uuid:conversation_id>/is-pinned",
+            methods=["POST"],
+            view_func=self.conversation_handler.update_conversation_is_pinned,
         )
 
         # 练习
