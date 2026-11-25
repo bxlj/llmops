@@ -137,5 +137,3 @@ yarn dev        # 启动在 5173 端口，直连后端 5000
 - [ ] 生产化部署（gunicorn + nginx + systemd）
 
 ---
-
-> 本项目为慕课网 LLMOps 课程的实践产出，欢迎交流学习。
