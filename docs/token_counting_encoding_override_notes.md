@@ -21,7 +21,7 @@ NotImplementedError: get_num_tokens_from_messages() is not presently implemented
 
 1. 只在**非 OpenAI 系**模型上出现（glm-5.3、kimi-k2.6、qwen3.8 均会复现），gpt-4o-mini 正常；
 2. 异常发生在子线程里，HTTP 接口仍返回 200，前端表现为流式输出中断/无响应，不看后端日志很难定位；
-3. 触发点是课程新增的 **token 统计 + 成本计算**代码，此前项目里没有任何地方调用 `get_num_tokens_from_messages`，所以问题一直潜伏。
+3. 触发点是新增的 **token 统计 + 成本计算**代码，此前项目里没有任何地方调用 `get_num_tokens_from_messages`，所以问题一直潜伏。
 
 ## 二、调用链与根因
 
@@ -178,7 +178,7 @@ metadata:
 | glm-5.3 | 0.0005 | 0.0015 | 映射 GLM-4.5 的 0.5/1.5 元每百万 |
 | glm-5.3-flash | 0.0001 | 0.0002 | 映射 GLM-4.5-Flash 的 0.1/0.2 元每百万 |
 
-带 ⚠️ 性质的映射价（kimi-k3、glm-5.3 系列）是课程型号无同名公开定价时按同厂同档真实型号填的，调价直接改对应 yaml 即可。改 yaml 和 chat.py 后都需**重启 flask**（`--no-debug` 无自动重载，yaml 在启动时由 `LanguageModelManager` 一次性读入缓存）。
+带 ⚠️ 性质的映射价（kimi-k3、glm-5.3 系列）是型号无同名公开定价时按同厂同档真实型号填的，调价直接改对应 yaml 即可。改 yaml 和 chat.py 后都需**重启 flask**（`--no-debug` 无自动重载，yaml 在启动时由 `LanguageModelManager` 一次性读入缓存）。
 
 ## 五、遗留风险：兜底模型缺 metadata
 

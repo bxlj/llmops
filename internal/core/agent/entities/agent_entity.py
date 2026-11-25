@@ -64,7 +64,7 @@ REACT_AGENT_SYSTEM_PROMPT_TEMPLATE = """你是一个高度定制的智能体应�
     - 示例: google_serper - 这是一个低成本的谷歌搜索API。当你需要搜索时事的时候，可以使用该工具，该工具的输入是一个查询语句, args: {{'query': {{'title': 'Query', 'description': '需要检索查询的语句.', 'type': 'string'}}}}
     - 格式: 工具名称 - 工具描述, args: 工具参数信息字典
   - LLM生成的工具调用参数说明:
-    - 示例: ```json\n{{"name": "google_serper", "args": {{"query": "慕课网 AI课程"}}}}\n```
+    - 示例: ```json\n{{"name": "google_serper", "args": {{"query": "Python 入门教程"}}}}\n```
     - 格式: ```json\n{{"name": 需要调用的工具名称, "args": 调用该工具的输入参数字典}}\n```
     - 要求:
       - 生成的内容必须是符合规范的json字符串，并且仅包含两个字段`name`和`args`，其中`name`代表工具的名称，`args`代表调用该工具传递的参数，如果没有参数则传递空字典`{{}}`。
@@ -72,12 +72,12 @@ REACT_AGENT_SYSTEM_PROMPT_TEMPLATE = """你是一个高度定制的智能体应�
       - 注意`工具描述参数args`和最终生成的`工具调用参数args`的区别，不要错误生成。
       - 如果不需要工具调用，则正常生成即可，程序会自动检测内容开头是否为"```json"进行判断
     - 正确示例:
-      - ```json\\n{{"name": "google_serper", "args": {{"query": "慕课网 AI课程"}}}}\\n```
+      - ```json\\n{{"name": "google_serper", "args": {{"query": "Python 入门教程"}}}}\\n```
       - ```json\\n{{"name": "current_time", "args": {{}}}}\\n```
       - ```json\\n{{"name": "dalle", "args": {{"query": "一幅老爷爷爬山的图片", "size": "1024x1024"}}}}\\n```
     - 错误示例:
-      - 错误原因(在最前的```json前生成了内容): 好的，我将调用工具进行搜索。\\n```json\\n{{"name": "google_serper", "args": {{"query": "慕课网 AI课程"}}}}\\n```
-      - 错误原因(在最后的```后生成了内容): ```json\\n{{"name": "google_serper", "args": {{"query": "慕课网 AI课程"}}}}\\n```，我将准备调用工具，请稍等。
+      - 错误原因(在最前的```json前生成了内容): 好的，我将调用工具进行搜索。\\n```json\\n{{"name": "google_serper", "args": {{"query": "Python 入门教程"}}}}\\n```
+      - 错误原因(在最后的```后生成了内容): ```json\\n{{"name": "google_serper", "args": {{"query": "Python 入门教程"}}}}\\n```，我将准备调用工具，请稍等。
       - 错误原因(生成了json，但是不包含在"```json"和"```"内): {{"name": "current_time", "args": {{}}}}
       - 错误原因(将描述参数的内容填充到生成参数中): ```json\\n{{"name": "google_serper", "args": {{"query": {{'title': 'Query', 'description': '需要检索查询的语句.', 'type': 'string'}}}}\n```
 

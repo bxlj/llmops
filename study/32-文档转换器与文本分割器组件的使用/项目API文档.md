@@ -28,11 +28,11 @@
             {
                 "app_count": 0,
                 "created_at": 1713105994,
-                "description": "这是专门用来存储慕课LLMOps课程信息的知识库",
+                "description": "这是专门用来存储AI应用文档的知识库",
                 "document_count": 13,
                 "icon": "https://imooc-llmops-1257184990.cos.ap-guangzhou.myqcloud.com/2024/04/07/96b5e270-c54a-4424-aece-ff8a2b7e4331.png",
                 "id": "c0759ca8-2d35-4480-83a8-1f41f29d1401",
-                "name": "慕课LLMOps课程知识库",
+                "name": "AI应用知识库",
                 "updated_at": 1713106758,
                 "word_count": 8850
             }
@@ -92,9 +92,9 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MTY0NTY3O
       "code": "success",
       "data": {
           "id": "5e7834dc-bbca-4ee5-9591-8f297f5acded",
-          "name": "慕课LLMOps聊天机器人",
+          "name": "LLMOpsLLMOps聊天机器人",
           "icon": "https://imooc-llmops-1257184990.cos.ap-guangzhou.myqcloud.com/2024/04/23/e4422149-4cf7-41b3-ad55-ca8d2caa8f13.png",
-          "description": "这是一个慕课LLMOps的Agent应用",
+          "description": "这是一个LLMOpsLLMOps的Agent应用",
           "published_app_config_id": null,
           "drafted_app_config_id": null,
           "debug_conversation_id": "1550b71a-1444-47ed-a59d-c2f080fbae94",
