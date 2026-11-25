@@ -1,4 +1,4 @@
-# 慕课 LLMOps AppBuilder
+# LLMOps AppBuilder
 
 一个从零开发的 LLMOps 平台：把大模型、知识库、工具、工作流编排成可发布、可对话的 AI 原生应用。类似 Dify / Coze 的产品形态，涵盖智能体、RAG 检索增强、可视化工作流、应用发布与 WebApp 对话的完整闭环。
 
